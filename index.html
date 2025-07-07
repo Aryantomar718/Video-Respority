@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Video Repository</title>
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+  <!-- Header -->
+  <header>
+    <div class="top-bar">
+      <h1>Dr. Chinmay Pandya <span>Video Repository</span></h1>
+      <button class="admin-btn">Admin Panel</button>
+    </div>
+    <div class="banner">
+      <h2>डॉ. चिन्मय पंड्या वीडियो संग्रह</h2>
+      <p>Digital repository of discourses by Dr. Chinmay Pandya on Yoga Science, Vedic Philosophy, and Indian Culture</p>
+    </div>
+  </header>
+
+  <!-- Search & Filter -->
+  <section class="filters">
+    <input type="text" id="searchInput" placeholder="Search by title or keywords...">
+    <select id="categoryFilter">
+      <option value="all">All Categories</option>
+    </select>
+    <select id="yearFilter">
+      <option value="all">All Years</option>
+    </select>
+    <select id="monthFilter">
+      <option value="all">All Months</option>
+      <option value="01">January</option>
+      <option value="02">February</option>
+      <option value="03">March</option>
+      <option value="04">April</option>
+      <option value="05">May</option>
+      <option value="06">June</option>
+      <option value="07">July</option>
+      <option value="08">August</option>
+      <option value="09">September</option>
+      <option value="10">October</option>
+      <option value="11">November</option>
+      <option value="12">December</option>
+    </select>
+    <button onclick="applyFilters()">Search</button>
+  </section>
+
+  <!-- Video Grid -->
+  <section class="video-grid" id="videoGrid"></section>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2025 Dev Sanskriti Vishwavidyalaya</p>
+  </footer>
+
+  <script>
+    const SHEET_ID = '1OPQPUPENDc8CIJ07lMUCECLcwh14wrOKueByGyck9w4';
+    const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
+
+    let allVideos = [];
+
+    fetch(SHEET_URL)
+      .then(response => response.text())
+      .then(data => {
+        const json = JSON.parse(data.substr(47).slice(0, -2));
+        const rows = json.table.rows;
+        const categories = new Set();
+        const years = new Set();
+
+        allVideos = [];
+
+        rows.forEach(row => {
+          const cells = row.c;
+          const title = cells[1]?.v?.trim();
+          const category = cells[2]?.v?.trim() || "";
+          const link = cells[3]?.v?.trim();
+          const keywords = cells[4]?.v?.trim() || "";
+          const dateStr = cells[5]?.f?.trim();
+          if (!title || !link || !dateStr) return;
+
+          const date = new Date(dateStr);
+          const year = date.getFullYear().toString();
+          const month = ("0" + (date.getMonth() + 1)).slice(-2);
+
+          const videoId = extractVideoID(link);
+          const thumbnail = videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : 'https://via.placeholder.com/320x180.png?text=No+Thumbnail';
+
+          allVideos.push({ title, category, link, keywords, dateStr, year, month, thumbnail });
+          if (category) categories.add(category);
+          years.add(year);
+        });
+
+        populateCategoryFilter([...categories]);
+        populateYearFilter([...years]);
+        renderVideos(allVideos);
+      })
+      .catch(err => {
+        console.error("Failed to load Google Sheets data:", err);
+        document.getElementById("videoGrid").innerHTML = "<p>Failed to load videos. Check console for details.</p>";
+      });
+
+    function renderVideos(videos) {
+      const container = document.getElementById("videoGrid");
+      container.innerHTML = videos.length ? "" : "<p>No videos found.</p>";
+
+      videos.forEach(video => {
+        const card = `
+          <a href="${video.link}" target="_blank" style="text-decoration:none;color:inherit;">
+            <div class="video-card">
+              <img src="${video.thumbnail}" alt="${video.title}">
+              <div class="video-info">
+                <span class="tag">${video.category || "Uncategorized"}</span>
+                <h4>${video.title}</h4>
+                <p>${video.dateStr}</p>
+              </div>
+            </div>
+          </a>`;
+        container.innerHTML += card;
+      });
+    }
+
+    function applyFilters() {
+      const keyword = document.getElementById("searchInput").value.toLowerCase();
+      const category = document.getElementById("categoryFilter").value;
+      const year = document.getElementById("yearFilter").value;
+      const month = document.getElementById("monthFilter").value;
+
+      let filtered = allVideos;
+
+      if (category !== "all") {
+        filtered = filtered.filter(v => (v.category || "").toLowerCase() === category.toLowerCase());
+      }
+      if (year !== "all") {
+        filtered = filtered.filter(v => v.year === year);
+      }
+      if (month !== "all") {
+        filtered = filtered.filter(v => v.month === month);
+      }
+      if (keyword) {
+        filtered = filtered.filter(v =>
+          v.title.toLowerCase().includes(keyword) ||
+          v.keywords.toLowerCase().includes(keyword)
+        );
+      }
+
+      renderVideos(filtered);
+    }
+
+    function populateCategoryFilter(categories) {
+      const select = document.getElementById("categoryFilter");
+      categories.sort().forEach(cat => {
+        const option = document.createElement("option");
+        option.value = cat;
+        option.textContent = cat;
+        select.appendChild(option);
+      });
+    }
+
+    function populateYearFilter(years) {
+      const select = document.getElementById("yearFilter");
+      years.sort((a, b) => b - a).forEach(yr => {
+        const option = document.createElement("option");
+        option.value = yr;
+        option.textContent = yr;
+        select.appendChild(option);
+      });
+    }
+
+    function extractVideoID(url) {
+      const regex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+      const match = url.match(regex);
+      return match ? match[1] : null;
+    }
+  </script>
+</body>
+</html>
